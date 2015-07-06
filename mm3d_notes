@@ -1,0 +1,33 @@
+In savedata the savefile path is "data:/saveX.bin", where X is 0..2, for each save-slot(if it exists). Each savefile is 0x13618-bytes.
+
+Initially each savefile is read to: 0x006b7c98 + savefileindex*0x140F8. This is what the game uses before the saveslot is fully loaded.
+
+0x007751d8 is the savefilestruct for the current savefile, originates from the above 0x006b7c98 array.
+
+Savefile structure:
+0x0 size 0x3: Magic "MJR".
+0x3 u8: Value 0x08.
+0x4 u32: Total size of the savefile, not actually used.
+0x8 u8: Current mask. 0 = none, 1 = mask of truth. Only hard-coded value checks are ever done with this field(which is copied into seperate heap state), no array(s).
+0x10 (s16): Time-flow, 0 = normal, 0xffff(-1) = slow(double-time). When this is non-zero, the "|>" icon is displayed on the time bar. This controls how many in-game minutes pass in a real-life second. 0xfffe = time stops.
+0x12 (s16?) Time-flow related? Set to 0xffff for double-time, but not actually required.
+0x14 32bit: Current day, 1-based. 0 seems to be an alias for 0x1? 0x4 == same as 0x3 with <clocktown tower rooftop accessible>, without the moon countdown(this is checked for in the game code). Using a negative value(bit31 set) will cause a null-deref: after the ptr gets initialized to a proper address, L_172570() gets called. L_172570() does not get called when the curday is non-negative: this function copies an address from a buffer where the last write was a memset(), to the previously mentioned ptr(which later causes the null-deref).
+0x26 (u8): Current form. 0 = fierce-form, 1 = goron, 4 = regular link. only 0..4 is valid, anything higher is out-of-bounds. L_468f70 is the very first function which reads this field, with the actual savedata(and also the one with the said bug). This bug isn't useful, since the only out-of-bounds id reads that can be triggered are with romfs filepaths(that is, the loaded id would be text from a filepath). Depending on the loaded id, this can either cause a crash(unmapped memory for the model filepath), or svcBreak due to invalid filepath. When the form in savedata is set to 0 @ game-load, the game will display the mask being removed once the game loads. The only known way to bypass this, is to edit this field in memory then enter another area in-game.
+0x128: utf16 playername. A heap buffer is allocated using wcslen(), without restricting the size. When successful the savedata string is copied into that buffer with a memcpy. When allocating that buffer fails due to the total string-len being larger than the free heap memory(0x2000-bytes) used with this, instead of executing the memcpy codepath above it will call a function with a nullptr, causing an useless crash. That field was only ever set to value 0x0 before this. This triggers at the savefile-select screen, before that screen is actually displayed.
+0x13a s16: Total number of hearts. Shift to the right by 4 to get the number of heart containers. Low 4-bits is the number of pieces-of-heart.
+0x13c s16: Same as 0x13a except this is for the number of filled hearts.
+0x140 (unk type): Total rupees.
+0x17c: Array of u8s, for each item. See also offset 0x1a30. Each entry is an itemid. 0x0 = ocarina. See the itemtable_dump file in this repo. Out-of-bounds array access can occur with invalid itemids, but this is not useful because none of the invalid itemids could result in loading any data from the savedata.
+0x1230 (unk type): Total rupees in bank.
+0x1a30: u8 Array with 20 entries, for the items screen. Each entry is an index for the array at save+0x17c.
+0x1a88 u16: CRC16, when calcuating the CRC16 the CRC16 is calculated over the entire savedata with this field cleared to zero.
+0x3526: Timestamp for last save. u16 year, u8 month, u8 day, u8 hour(24h), and u8 minute.
+0x36cc: u32 Size for the following mpo. Modifying this has no affect.
+0x36d0: MPO for the last taken pictograph, the data located here is never cleared(such as when writing here, or when this data isn't used).
+
+Overwriting save+0x1000 size 0x800 with junk eventually causes a crash in the notebook once one scrolls down enough(read attempt with base address 0xf). The exact cause is unknown, but the value of the ptr can't be controlled it seems.
+
+u16 save+0x351c = <junk> causes an useless crash.
+
+Out-of-bounds memory access can occur at game-load, when the heart-status field(s) are out-of-bounds. This probably isn't useful since there doesn't seem to be any data from savedata accessible with this. In the array, upto 0x2000-bytes(positive and negative) relative to the array start can be accessed.
+

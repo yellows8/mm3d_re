@@ -21,15 +21,15 @@ Savefile structure:
 0x1230 (unk type): Total rupees in bank.
 0x1a30: u8 Array with 20 entries, for the items screen. Each entry is an index for the array at save+0x17c.
 0x1a88 u16: CRC16, when calcuating the CRC16 the CRC16 is calculated over the entire savedata with this field cleared to zero.
-0x3518 u16: Same format as 0x351c, except this is used for the current-location string displayed for the saveslot.
-0x351c u16: Bitfields stored here determine the location where the game was last saved, for the area to actually load.
+0x3518 u16: Same format as 0x351c, except this is used for the current-scene string displayed for the saveslot.
+0x351c u16: Bitfields stored here determine the current scene. Bits15..9 = sectionid0, bits8..4 = sectionid1, bits3..0 = sectionid2.
 0x3526: Timestamp for last save. u16 year, u8 month, u8 day, u8 hour(24h), and u8 minute.
 0x36cc: u32 Size for the following mpo. Modifying this has no affect.
 0x36d0: MPO for the last taken pictograph, the data located here is never cleared(such as when writing here, or when this data isn't used).
 
 Overwriting save+0x1000 size 0x800 with junk eventually causes a crash in the notebook once one scrolls down enough(read attempt with base address 0xf). The exact cause is unknown, but the value of the ptr can't be controlled it seems.
 
-u16 save+0x351c / u16 save+0x3518 = <junk> causes an useless crash in L_2221f0, at game-loading. This is caused out-of-bounds array index, where the index is values from the savedata bitfields.
+u16 save+0x351c / u16 save+0x3518 = <junk> causes a crash in L_2221f0(aka getsceneid()), at game-loading. This is caused by out-of-bounds array index, where the index is values from the savedata bitfields. None of the non-crash-trigger values can cause loading any data from savedata.
 
 Out-of-bounds memory access can occur at game-load, when the heart-status field(s) are out-of-bounds. This probably isn't useful since there doesn't seem to be any data from savedata accessible with this. In the array, upto 0x2000-bytes(positive and negative) relative to the array start can be accessed.
 
